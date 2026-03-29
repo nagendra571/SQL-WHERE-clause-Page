@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Truth Table – IF A THEN B</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    body{font-family:'Inter',sans-serif;background:#fafafa;padding:2rem;text-align:center;}
+    table{margin:0 auto;border-collapse:collapse;font-size:1.1rem;}
+    th,td{border:1px solid #cfd8dc;padding:.4rem .8rem;min-width:70px;}
+    th{background:#c8e6c9;color:#1b5e20;}
+    .true{background:#c8e6c9;color:#1b5e20;}
+    .false{background:#ffebee;color:#c62828;}
+    @keyframes rowFade{0%{opacity:0;transform:translateY(10px)}100%{opacity:1;transform:none}}
+    tbody tr{opacity:0;animation:rowFade .5s forwards;}
+    tbody tr:nth-child(1){animation-delay:.3s}
+    tbody tr:nth-child(2){animation-delay:.6s}
+    tbody tr:nth-child(3){animation-delay:.9s}
+    tbody tr:nth-child(4){animation-delay:1.2s}
+  </style>
+</head>
+<body>
+  <h1>IF A THEN B ≡ (NOT A) OR B</h1>
+
+  <table>
+    <thead>
+      <tr><th>A</th><th>B</th><th>A → B</th><th>¬A</th><th>¬A ∨ B</th></tr>
+    </thead>
+    <tbody>
+      <tr><td class="true">T</td><td class="true">T</td><td class="true">T</td><td class="false">F</td><td class="true">T</td></tr>
+      <tr><td class="false">F</td><td class="true">T</td><td class="true">T</td><td class="true">T</td><td class="true">T</td></tr>
+      <tr><td class="true">T</td><td class="false">F</td><td class="false">F</td><td class="false">F</td><td class="false">F</td></tr>
+      <tr><td class="false">F</td><td class="false">F</td><td class="true">T</td><td class="true">T</td><td class="true">T</td></tr>
+    </tbody>
+  </table>
+
+  <p style="margin-top:2rem;font-size:.9rem;color:#555">
+    The green rows are TRUE, the red rows are FALSE.
+  </p>
+</body>
+</html>

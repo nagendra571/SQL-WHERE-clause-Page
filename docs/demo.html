@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>SQL CASE vs Boolean – Animated Demo</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=Fira+Code:wght@400;600&display=swap" rel="stylesheet">
+<link href="https://unpkg.com/feather-icons/dist/feather.css" rel="stylesheet">
+<style>
+  body{font-family:'Inter',sans-serif;background:#fafafa;color:#2e2e2e;margin:0;padding:2rem;}
+  h1{font-size:2rem;color:#006064;text-align:center;}
+  .section{margin:3rem 0;max-width:970px;margin-left:auto;margin-right:auto;}
+  .code{background:#eaeaea;padding:.8rem;border-radius:.4rem;font-family:'Fira Code',monospace;font-size:.95rem;overflow-x:auto;}
+  .highlight{color:#43a047;font-weight:600;}
+  .bad{color:#c62828;}
+  .icon{width:32px;height:32px;vertical-align:middle;}
+  iframe{border:none;width:100%;height:200px;margin:1rem 0;}
+  .chart{position:relative;width:80%;margin:2rem auto;height:120px;}
+  .bar{position:absolute;bottom:0;background:#c8e6c9;width:45%;border-radius:4px;}
+  .bar.bad{background:#ffebee;}
+  .label{position:absolute;bottom:100%;font-size:.85rem;transform:translateX(-50%);}
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+</head>
+<body>
+
+<h1>SQL WHERE clauses – CASE vs Boolean</h1>
+
+<div class="section">
+  <h2>🔧  The “CASE” trap</h2>
+  <div class="code">WHERE EmpID = CASE WHEN @ReturnAll&lt;&gt;1 THEN @EmpID ELSE EmpID END</div>
+  <p class="bad">❌ Forces a table scan – the engine must evaluate the <code>CASE</code> for every row.</p>
+</div>
+
+<div class="section">
+  <h2>✅  Boolean rewrite</h2>
+  <div class="code">WHERE (@ReturnAll = 1) OR (EmpID = @EmpID)</div>
+  <p class="highlight">✔️ The optimizer can short‑circuit; if <code>@ReturnAll = 1</code> it never looks at <code>EmpID</code>.</p>
+</div>
+
+<div class="section">
+  <h2>🧠  Logical equivalence</h2>
+  <iframe src="truth.html" style="height: 410px;"></iframe>
+  <p>“If A then B” ⇔ “Not A OR B”.</p>
+</div>
+
+<div class="section">
+  <h2>📚  Real‑world examples</h2>
+
+  <!-- Example 1 -->
+  <h3>Example 1 – Return all or a single employee</h3>
+  <div class="code">-- CASE version (slow)<br>WHERE EmpID = CASE WHEN @ReturnAll&lt;&gt;1 THEN @EmpID ELSE EmpID END</div>
+  <div class="code">-- Boolean version (fast)<br>WHERE (@ReturnAll = 1) OR (EmpID = @EmpID)</div>
+
+  <!-- Example 2 -->
+  <h3>Example 2 – Multi‑column optional filter</h3>
+  <div class="code">-- CASE version (3 CASEs)<br>WHERE Date = CASE WHEN @Filter=1 THEN @Date ELSE Date END<br> AND Cust = CASE WHEN @Filter=1 THEN @Cust ELSE Cust END<br> AND Emp  = CASE WHEN @Filter=1 THEN @Emp  ELSE Emp END</div>
+  <div class="code">-- Boolean version (single OR)<br>WHERE @Filter <> 1 OR (Date = @Date AND Cust = @Cust AND Emp = @Emp)</div>
+
+  <!-- Example 3 -->
+  <h3>Example 3 – Optional parameter (NULL = ignore filter)</h3>
+  <div class="code">-- ISNULL/COALESCE (bad)<br>WHERE CustID = ISNULL(@CustID, CustID)</div>
+  <div class="code">-- Boolean (good)<br>WHERE (@CustID IS NULL) OR (CustID = @CustID)</div>
+</div>
+
+<div class="section">
+  <h2>🚀  Performance comparison (animated chart)</h2>
+  <div class="chart">
+    <div class="bar bad" id="badBar" style="left:5%;height:90px;"></div>
+    <div class="bar" id="goodBar" style="right:5%;height:35px;"></div>
+
+    <div class="label" style="left:5%;">CASE (slow)</div>
+    <div class="label" style="right:5%;">Boolean (fast)</div>
+    <div class="label" style="top:-30px;left:50%;transform:translateX(-50%;">Execution time (ms)</div>
+  </div>
+</div>
+
+<script>
+  // GSAP animation for the chart bars
+  gsap.from('#badBar',{height:0,duration:1.2,ease:"power2.out"});
+  gsap.from('#goodBar',{height:0,duration:1.2,delay:0.3,ease:"power2.out"});
+</script>
+
+<div class="section">
+  <h2>🗒️ Cheat‑sheet (copy‑paste)</h2>
+  <pre class="code">
+-- IF A THEN B
+WHERE (NOT A) OR B
+
+-- IF A THEN B ELSE C
+WHERE ((NOT A) OR B) AND (A OR C)
+
+-- Optional filter (parameter may be NULL)
+WHERE (@Param IS NULL) OR (Column = @Param)
+  </pre>
+</div>
+
+<footer style="text-align:center;margin-top:3rem;color:#777;font-size:.9rem;">
+  © 2026 – Your Name – <a href="mailto:you@example.com">Contact</a>
+</footer>
+
+</body>
+</html>
