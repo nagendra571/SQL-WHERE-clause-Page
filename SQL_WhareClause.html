@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>SQL WHERE clause: Ditch CASE, embrace Boolean logic</title>
+
+<!-- -------------- Fonts & Icons ---------------- -->
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Fira+Code:wght@400;500;600&display=swap" rel="stylesheet">
+
+<!-- -------------- Basic Reset ---------------- -->
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html{font-size:100%;scroll-behavior:smooth}
+body{
+  font-family:'Inter',system-ui,sans-serif;
+  line-height:1.6;
+  color:#2e2e2e;
+  background:#fafafa;
+  padding:2rem 1rem;
+}
+h1,h2,h3{font-weight:600;color:#006064}
+h1{font-size:2.2rem;margin-bottom:1rem}
+h2{font-size:1.8rem;margin:2rem 0 .8rem}
+h3{font-size:1.4rem;margin:1.5rem 0 .6rem}
+p{margin:0 0 1rem}
+a{color:#006064;text-decoration:none}
+a:hover{background:#e0f2f1}
+code,pre{
+  font-family:'Fira Code',monospace;
+  background:#e8e8e8;
+  border-radius:4px;
+}
+pre{
+  overflow:auto;
+  padding:1rem;
+  margin:1rem 0;
+}
+blockquote{
+  border-left:4px solid #80cbc4;
+  background:#f1f8e9;
+  padding:.8rem 1rem;
+  margin:.5rem 0;
+  font-style:italic;
+  color:#4e342e;
+}
+table{
+  width:auto;
+  border-collapse:collapse;
+  margin:1rem auto;
+}
+th,td{
+  border:1px solid #cfd8dc;
+  padding:.4rem .8rem;
+  text-align:center;
+}
+th{background:#c8e6c9;color:#1b5e20}
+tfoot{font-size:.9rem;color:#555}
+</style>
+
+<!-- -------------- Syntax Highlighting (Prism) ---------------- -->
+<link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-okaidia.min.css" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-sql.min.js"></script>
+
+<!-- -------------- Truth‑Table Animation ---------------- -->
+<style>
+@keyframes fadeIn{
+  0%{opacity:0}
+  100%{opacity:1}
+}
+.truth-table tbody tr{
+  opacity:0;
+  animation:fadeIn .6s ease forwards;
+}
+.truth-table tbody tr:nth-child(1){animation-delay:.2s}
+.truth-table tbody tr:nth-child(2){animation-delay:.4s}
+.truth-table tbody tr:nth-child(3){animation-delay:.6s}
+.truth-table tbody tr:nth-child(4){animation-delay:.8s}
+</style>
+
+</head>
+<body>
+
+<h1>SQL WHERE clause: Ditch CASE, embrace Boolean logic</h1>
+
+<p>When you need to filter rows based on optional parameters, the first instinct is often to reach for a <code>CASE</code> expression inside the <code>WHERE</code> clause. It works, but it pays a hidden price in readability, portability and – most importantly – performance.</p>
+
+<p>In this post I’ll show you how to replace those <code>CASE</code>‑laden filters with plain <strong>AND / OR / NOT</strong> logic. The result is:</p>
+
+<ul>
+<li>📦 <strong>Portable</strong> – works on every major RDBMS (SQL Server, Oracle, PostgreSQL, MySQL …). </li>
+<li>👀 <strong>Easy to read</strong> – a developer can understand the intent in a single glance. </li>
+<li>⚡ <strong>Fast</strong> – the query optimizer can use indexes and short‑circuit evaluation.</li>
+</ul>
+
+<hr>
+
+<h2>1️⃣ The logical secret: “IF A THEN B” = “NOT A OR B”</h2>
+
+<p>In propositional logic an implication <em>p → q</em> is equivalent to <em>¬p ∨ q</em>. That is, “if A then B” is true whenever <strong>A is false</strong> **or** <strong>B is true</strong>. </p>
+
+<table class="truth-table">
+<thead>
+  <tr><th>A</th><th>B</th><th>A → B</th><th>¬A</th><th>¬A ∨ B</th></tr>
+</thead>
+<tbody>
+  <tr><td>T</td><td>T</td><td>T</td><td>F</td><td>T</td></tr>
+  <tr><td>F</td><td>T</td><td>T</td><td>T</td><td>T</td></tr>
+  <tr><td>T</td><td>F</td><td>F</td><td>F</td><td>F</td></tr>
+  <tr><td>F</td><td>F</td><td>T</td><td>T</td><td>T</td></tr>
+</tbody>
+</table>
+
+<p>Both columns “A → B” and “¬A ∨ B” have identical truth values, which proves the equivalence.  (See Wikipedia for the formal proof – <a href="https://en.wikipedia.org/wiki/Logical_equivalence">p → q ≡ ¬p ∨ q</a>)【13†L60-L66】.</p>
+
+<h3>Why this matters for SQL</h3>
+If you turn an “IF A THEN B” test into “NOT A OR B”, the optimizer sees a <strong>plain Boolean</strong> expression. It can then:
+<ul>
+<li>use index seeks on the <code>B</code> part only when <code>A</code> is false,</li>
+<li>short‑circuit the evaluation (skip <code>B</code> entirely when <code>A</code> is true).</li>
+</ul>
+
+In contrast, a <code>CASE</code> expression forces the engine to evaluate every <code>WHEN</code> branch in order – often resulting in a table scan and no index usage【9†L54-L61】.
+
+<hr>
+
+<h2>2️⃣ Translating real‑world filters</h2>
+
+<h3>🔹 Example 1 – “Return all rows unless a specific employee is requested”</h3>
+
+<p><strong>What we want:</strong> if <code>@ReturnAll = 1</code> → return every row; otherwise → return rows where <code>EmpID = @EmpID</code>.</p>
+
+<table>
+<thead><tr><th>CASE version (hard to read)</th><th>Boolean version (clean)</th></tr></thead>
+<tbody>
+<tr>
+<td><pre><code class="language-sql">WHERE EmpID = CASE WHEN @ReturnAll <> 1
+                    THEN @EmpID
+                    ELSE EmpID END</code></pre></td>
+<td><pre><code class="language-sql">WHERE (@ReturnAll = 1) OR (EmpID = @EmpID)</code></pre></td>
+</tr>
+</tbody>
+</table>
+
+*If <code>@ReturnAll = 1</code> the first predicate is true and the whole <code>WHERE</code> clause short‑circuits – the engine never touches <code>EmpID</code>.*  
+
+<hr>
+
+<h3>🔹 Example 2 – “Filter on a group of columns only when @Filter = 1”</h3>
+
+<p>Goal: when <code>@Filter = 1</code> enforce <code>Date = @Date</code>, <code>Cust = @Cust</code> **and** <code>Emp = @Emp</code>. Otherwise ignore all three filters.</p>
+
+<table>
+<thead><tr><th>CASE version (three CASEs)</th><th>Boolean version (single OR)</th></tr></thead>
+<tbody>
+<tr>
+<td><pre><code class="language-sql">WHERE Date = CASE WHEN @Filter = 1 THEN @Date ELSE Date END
+  AND Cust = CASE WHEN @Filter = 1 THEN @Cust ELSE Cust END
+  AND Emp  = CASE WHEN @Filter = 1 THEN @Emp  ELSE Emp  END</code></pre></td>
+<td><pre><code class="language-sql">WHERE @Filter <> 1
+   OR (Date = @Date AND Cust = @Cust AND Emp = @Emp)</code></pre></td>
+</tr>
+</tbody>
+</table>
+
+*Only when <code>@Filter <> 1</code> does the optimizer need to evaluate the three column predicates – the rest of the rows are filtered instantly.*  
+
+<hr>
+
+<h3>🔹 Example 3 – “Optional single‑column filter (the classic ISNULL/COALESCE pattern)”</h3>
+
+<p>Typical code:</p>
+
+<pre><code class="language-sql">WHERE CustID = ISNULL(@CustID, CustID)   -- or COALESCE(@CustID, CustID)
+</code></pre>
+
+<p>Problems:</p>
+<ul>
+<li>The expression defeats index usage (SQL Server must apply the function to every row)【11†L41-L63】.</li>
+<li>Nullable columns cause three‑valued logic headaches (the predicate can become UNKNOWN).</li>
+</ul>
+
+<p>Boolean rewrite (the gold standard):</p>
+
+<pre><code class="language-sql">WHERE (@CustID IS NULL) OR (CustID = @CustID)
+</code></pre>
+
+*If the input parameter is <code>NULL</code> the first part evaluates to <code>TRUE</code>, short‑circuiting the index‑seek on <code>CustID</code>. This pattern works on every RDBMS and keeps the query SARGable (search‑argument‑able).*  
+
+<hr>
+
+<h2>3️⃣ When you really need <code>CASE</code> in a <code>WHERE</code> clause</h2>
+
+<p>There are a few edge‑cases where you must decide on a value before the predicate can be built (e.g. dynamically choosing a column). In those rare scenarios you can still <strong>avoid</strong> <code>CASE</code> by using dynamic SQL or splitting the logic into two separate statements (one for each branch). All other conditional logic belongs to the Boolean realm described above.</p>
+
+<h3>⚡ Performance snapshot – CASE vs Boolean</h3>
+
+<p>Gordon Linoff summed it up perfectly:</p>
+
+<blockquote>
+“Yes. There is a major, major difference between using a <code>CASE</code> expression and boolean expressions in the <code>WHERE</code> clause. The optimizer understands boolean expressions, but <code>CASE</code> must be evaluated in the order written, which forces a table scan and prevents index usage【9†L54-L61】.”
+</blockquote>
+
+<p>In practice you’ll see execution plans where the Boolean version uses an <strong>Index Seek</strong> (or a range scan) while the <code>CASE</code> version falls back to an <strong>Clustered/Index Scan</strong>. The impact multiplies dramatically on large tables.</p>
+
+<hr>
+
+<h2>4️⃣ Cheat‑sheet – quick reference for the most common patterns</h2>
+
+<table>
+<thead>
+<tr><th>Pattern description</th><th>SQL (Boolean) </th><th>Notes</th></tr>
+</thead>
+<tbody>
+<tr>
+<td>Simple “IF A THEN B”</td>
+<td><code>(NOT A) OR B</code></td>
+<td>Direct translation of implication.</td>
+</tr>
+<tr>
+<td>“IF A THEN B ELSE C”</td>
+<td><code>((NOT A) OR B) AND (A OR C)</code></td>
+<td>Two‑clause form – rarely needed, but useful for full ternary logic.</td>
+</tr>
+<tr>
+<td>“Optional filter: only apply when @P is NOT NULL”</td>
+<td><code>(@P IS NULL) OR (Column = @P)</code></td>
+<td>SARGable – uses an index on <code>Column</code>.</td>
+</tr>
+<tr>
+<td>“Apply filter when @Flag = 1”</td>
+<td><code>(@Flag <> 1) OR (Column = @Value)</code></td>
+<td>Same as the ReturnAll example.</td>
+</tr>
+<tr>
+<td>“Combine several optional columns”</td>
+<td><code>(@P1 IS NULL OR Col1 = @P1)
+   AND (@P2 IS NULL OR Col2 = @P2)
+   AND ...</code></td>
+<td>Each predicate short‑circuits independently.</td>
+</tr>
+</tbody>
+</table>
+
+<hr>
+
+<h2>5️⃣ TL;DR – The “golden rule”</h2>
+
+<blockquote>
+<strong>Never put <code>CASE</code> (or <code>ISNULL/COALESCE</code>) around column references in a <code>WHERE</code> clause. Convert every conditional requirement to a plain Boolean expression using <code>AND / OR / NOT</code>.</strong>
+</blockquote>
+
+<p>Doing so gives you:</p>
+<ul>
+<li>Portable code (works on every major dialect).</li>
+<li>Readability that any junior developer can grasp.</li>
+<li>Speed – the optimizer can use indexes and short‑circuit logic.</li>
+</ul>
+
+<p>Give it a try in your next stored procedure – you’ll notice the execution plans getting dramatically tighter.</p>
+
+<hr>
+
+<h2>📝 References & Further Reading</h2>
+
+<ol>
+<li>Jeff Smith, “SQL WHERE clauses: Avoid CASE, use Boolean logic”, SQLTeam Blog (2003). The original article that introduced the logical equivalence and examples. 【12†L35-L44】【12†L50-L66】【12†L71-L84】</li>
+<li>Gordon Linoff, “Performance of CASE statement in WHERE condition”, Stack Overflow (2021). Shows why the optimizer prefers Boolean expressions. 【9†L54-L61】</li>
+<li>Wikipedia, “Logical equivalence”, especially the rule <code>p → q ≡ ¬p ∨ q</code>. 【13†L60-L66】</li>
+<li>Stack Overflow, “Index seek with COALESCE/ISNULL”, (2011). Demonstrates the index‑scan penalty of using functions in predicates. 【11†L41-L63】【11†L104-L107】</li>
+<li>SQLServerPerformance.com, “Optimizing conditional WHERE clauses”. (Good companion article for more advanced patterns.)</li>
+</ol>
+
+<footer style="text-align:center;margin-top:3rem;color:#555;font-size:.9rem;">
+© 2026 — YourName | <a href="mailto:you@example.com">Contact</a>
+</footer>
+
+</body>
+</html>
