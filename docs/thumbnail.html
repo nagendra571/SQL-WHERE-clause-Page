@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Thumbnail – SQL WHERE clause</title>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;700&family=Barlow:wght@400;600&family=Fira+Code:wght@400;600&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+
+body{
+  width:1200px;
+  height:628px;
+  background:#011c1c;
+  font-family:'Barlow',sans-serif;
+  overflow:hidden;
+  position:relative;
+}
+
+/* ── Background geometry ─────────────────────────────── */
+.bg-circle-1{
+  position:absolute;
+  width:520px;height:520px;
+  border-radius:50%;
+  border:1.5px solid rgba(38,198,218,.12);
+  top:-140px;left:-140px;
+}
+.bg-circle-2{
+  position:absolute;
+  width:340px;height:340px;
+  border-radius:50%;
+  border:1.5px solid rgba(38,198,218,.08);
+  top:-60px;left:-60px;
+}
+.bg-line{
+  position:absolute;
+  top:0;bottom:0;left:480px;
+  width:1px;
+  background:linear-gradient(to bottom,transparent,rgba(38,198,218,.25) 30%,rgba(38,198,218,.25) 70%,transparent);
+}
+.dot-grid{
+  position:absolute;
+  right:0;bottom:0;
+  width:340px;height:260px;
+  background-image:radial-gradient(rgba(38,198,218,.18) 1px,transparent 1px);
+  background-size:22px 22px;
+}
+.corner-accent{
+  position:absolute;
+  bottom:0;left:0;
+  width:180px;height:3px;
+  background:linear-gradient(to right,#26c6da,transparent);
+}
+.top-accent{
+  position:absolute;
+  top:0;right:0;
+  width:3px;height:180px;
+  background:linear-gradient(to bottom,#26c6da,transparent);
+}
+
+/* ── LEFT PANEL ─────────────────────────────────────── */
+.left{
+  position:absolute;
+  top:0;left:0;bottom:0;
+  width:468px;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  padding:48px 44px;
+}
+
+.tag{
+  display:inline-flex;
+  align-items:center;
+  gap:7px;
+  background:rgba(38,198,218,.12);
+  border:1px solid rgba(38,198,218,.3);
+  border-radius:3px;
+  padding:5px 12px;
+  font-size:11px;
+  font-weight:600;
+  letter-spacing:.1em;
+  color:#26c6da;
+  text-transform:uppercase;
+  margin-bottom:28px;
+  width:fit-content;
+}
+.tag-dot{width:6px;height:6px;border-radius:50%;background:#26c6da}
+
+.title-small{
+  font-family:'Oswald',sans-serif;
+  font-size:22px;
+  font-weight:500;
+  color:rgba(255,255,255,.55);
+  letter-spacing:.04em;
+  text-transform:uppercase;
+  margin-bottom:4px;
+}
+.title-main{
+  font-family:'Oswald',sans-serif;
+  font-size:58px;
+  font-weight:700;
+  color:#ffffff;
+  line-height:.95;
+  text-transform:uppercase;
+  letter-spacing:-.01em;
+  margin-bottom:4px;
+}
+.title-accent{
+  font-family:'Oswald',sans-serif;
+  font-size:58px;
+  font-weight:700;
+  color:#26c6da;
+  line-height:.95;
+  text-transform:uppercase;
+  letter-spacing:-.01em;
+  margin-bottom:32px;
+}
+
+.divider{
+  width:40px;height:2px;
+  background:#26c6da;
+  margin-bottom:24px;
+}
+
+.stat-row{
+  display:flex;
+  align-items:baseline;
+  gap:8px;
+  margin-bottom:8px;
+}
+.stat-num{
+  font-family:'Oswald',sans-serif;
+  font-size:42px;
+  font-weight:700;
+  color:#69f0ae;
+  line-height:1;
+}
+.stat-label{
+  font-size:14px;
+  color:rgba(255,255,255,.6);
+  font-weight:600;
+}
+.stat-sub{
+  font-size:12px;
+  color:rgba(255,255,255,.38);
+  margin-bottom:28px;
+  font-family:'Fira Code',monospace;
+}
+
+.url-row{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  margin-top:auto;
+  padding-top:28px;
+}
+.url-icon{
+  width:16px;height:16px;
+  border:1.5px solid #26c6da;
+  border-radius:2px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:8px;color:#26c6da;
+  flex-shrink:0;
+}
+.url-text{
+  font-size:11px;
+  color:rgba(38,198,218,.7);
+  font-family:'Fira Code',monospace;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+
+/* ── RIGHT PANEL ─────────────────────────────────────── */
+.right{
+  position:absolute;
+  top:0;right:0;bottom:0;
+  left:480px;
+  display:flex;
+  flex-direction:column;
+  padding:36px 36px 36px 40px;
+  gap:16px;
+}
+
+/* code cards */
+.card{
+  flex:1;
+  border-radius:8px;
+  padding:18px 20px;
+  position:relative;
+  overflow:hidden;
+}
+.card-bad{
+  background:#1a0505;
+  border:1px solid rgba(239,83,80,.35);
+}
+.card-good{
+  background:#051505;
+  border:1px solid rgba(105,240,174,.3);
+}
+
+.card-header{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  margin-bottom:12px;
+}
+.card-badge{
+  font-size:10px;
+  font-weight:700;
+  letter-spacing:.08em;
+  text-transform:uppercase;
+  border-radius:3px;
+  padding:3px 9px;
+}
+.card-badge-bad{background:rgba(239,83,80,.18);color:#ef5350}
+.card-badge-good{background:rgba(105,240,174,.15);color:#69f0ae}
+
+.card-perf{
+  font-family:'Fira Code',monospace;
+  font-size:11px;
+  margin-left:auto;
+}
+.card-perf-bad{color:rgba(239,83,80,.8)}
+.card-perf-good{color:rgba(105,240,174,.8)}
+
+pre.code{
+  font-family:'Fira Code',monospace;
+  font-size:13px;
+  line-height:1.7;
+  background:none;
+  border-radius:0;
+  padding:0;
+  margin:0;
+  overflow:hidden;
+}
+
+.kw{color:#26c6da}
+.fn{color:#ffd54f}
+.varb{color:white}
+.val{color:#ce93d8}
+.str{color:#a5d6a7}
+.cmt{color:rgba(255,255,255,.28);font-style:italic}
+
+.card-footer{
+  display:flex;
+  align-items:center;
+  gap:16px;
+  margin-top:12px;
+  padding-top:10px;
+  border-top:1px solid rgba(255,255,255,.06);
+}
+.metric{
+  display:flex;
+  align-items:center;
+  gap:5px;
+  font-size:12px;
+  font-family:'Fira Code',monospace;
+}
+.metric-icon-bad{font-size:10px;color:#ef5350}
+.metric-icon-good{font-size:10px;color:#69f0ae}
+.metric-val-bad{color:#ef5350;font-weight:600}
+.metric-val-good{color:#69f0ae;font-weight:600}
+.metric-label{color:rgba(255,255,255,.35)}
+
+/* vs badge */
+.vs-badge{
+  position:absolute;
+  left:50%;transform:translateX(-50%);
+  top:50%;
+  margin-top:-2px;
+  z-index:10;
+}
+.vs-inner{
+  background:#011c1c;
+  border:1px solid rgba(38,198,218,.3);
+  border-radius:50%;
+  width:36px;height:36px;
+  display:flex;align-items:center;justify-content:center;
+  font-family:'Oswald',sans-serif;
+  font-size:13px;
+  font-weight:700;
+  color:rgba(38,198,218,.8);
+  letter-spacing:.04em;
+}
+</style>
+</head>
+<body>
+
+<!-- background decoration -->
+<div class="bg-circle-1"></div>
+<div class="bg-circle-2"></div>
+<div class="bg-line"></div>
+<div class="dot-grid"></div>
+<div class="corner-accent"></div>
+<div class="top-accent"></div>
+
+<!-- ── LEFT ── -->
+<div class="left">
+  <div class="tag"><div class="tag-dot"></div>SQL Performance</div>
+
+  <div class="title-small">SQL WHERE clause</div>
+  <div class="title-main">Ditch CASE,</div>
+  <div class="title-accent">Embrace Boolean</div>
+
+  <div class="divider"></div>
+
+  <div class="stat-row">
+    <div class="stat-num">62×</div>
+    <div class="stat-label">faster on 1M rows</div>
+  </div>
+  <div class="stat-sub">3,200 ms → 52 ms &nbsp;·&nbsp; 22,000 reads → 2 reads</div>
+
+  <div class="url-row">
+    <div class="url-icon">↗</div>
+    <div class="url-text">nagendra571.github.io/SQL-WHERE-clause-Page</div>
+  </div>
+</div>
+
+<!-- ── RIGHT ── -->
+<div class="right">
+
+  <div class="card card-bad">
+    <div class="card-header">
+      <span class="card-badge card-badge-bad">❌ CASE in WHERE</span>
+      <span class="card-perf card-perf-bad">Index Scan · 3,200 ms</span>
+    </div>
+    <pre class="code"><span class="kw">WHERE</span> <span class="val">1</span> =
+  <span class="kw">CASE</span>
+    <span class="kw">WHEN</span><span class="varb"> status </span><span class="fn">=</span><span class="str">'Active'</span>
+     <span class="kw">AND</span><span class="varb"> score  </span><span class="fn">&gt;=</span> <span class="val">10</span>
+    <span class="kw">THEN</span> <span class="val">1</span>
+    <span class="kw">ELSE</span> <span class="val">0</span>
+  <span class="kw">END</span>;</pre>
+    <div class="card-footer">
+      <div class="metric">
+        <span class="metric-icon-bad">✗</span>
+        <span class="metric-val-bad">22,000</span>
+        <span class="metric-label">logical reads</span>
+      </div>
+      <div class="metric">
+        <span class="metric-icon-bad">✗</span>
+        <span class="metric-label">Non-SARGable · full table scan</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="card card-good">
+    <div class="card-header">
+      <span class="card-badge card-badge-good">✅ Boolean WHERE</span>
+      <span class="card-perf card-perf-good">Index Seek · 52 ms</span>
+    </div>
+    <pre class="code"><span class="kw">WHERE</span><span class="varb"> status</span><span class="fn"> =</span><span class="str">'Active'</span>
+  <span class="kw">AND</span><span class="varb">  score</span>  <span class="fn">&gt;=</span> <span class="val">10</span>;
+
+
+<span class="cmt">-- optimizer uses the index directly</span></pre>
+    <div class="card-footer">
+      <div class="metric">
+        <span class="metric-icon-good">✓</span>
+        <span class="metric-val-good">2</span>
+        <span class="metric-label">logical reads</span>
+      </div>
+      <div class="metric">
+        <span class="metric-icon-good">✓</span>
+        <span class="metric-label">SARGable · index seek</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+</body>
+</html>
